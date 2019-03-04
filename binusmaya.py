@@ -119,7 +119,7 @@ class initialise_browser:
 		
 		self.browser = webdriver.Chrome(self.browserPath, options=op, service_args=sargs)
 
-		self.browser.implicitly_wait(20)
+		self.browser.implicitly_wait(5)
 		
 		return self.browser, self.downloadPath
 	
@@ -187,7 +187,6 @@ class Login:
 		
 		return elements
 	
-	
 	@staticmethod
 	def login(browser):
 		
@@ -241,52 +240,56 @@ def load_url(browser, url):
 		Login.handle_session_timeout(browser)
 		sleep(0.5)
 
+class Category:
+	def __init__(self, name):
+		self.name = name
+
+	def __eq__(self, other):
+		return self.name==other.name
+	
+	def __ne__(self, other):
+		return self.name!=other.name
+
+	def __hash__(self):
+		return hash(self.name)
+
+	def path(self):
+		return remove_non_path(self.name)
+
+class Period(Category):
+	def __init__(self, name):
+		super().__init__(name)
+		self.courses = {}
+	
+class Course(Category):
+	def __init__(self, name):
+		super().__init__(name)
+		self.classes = {}
+
+class Class(Category):
+	def __init__(self, name):
+		super().__init__(name)
+		self.threads = set()
+		
+class Thread:
+	def __init__(self, url, name, by):
+		self.url = url
+		self.name = name
+		self.by = by
+		if url[-5:] != '?id=1': raise ValueError('Unexpected url suffix')
+
+	def get_idx(self):
+		return self.url.split('.')[-1][:-5]
+	
+	def path(self):
+		return remove_non_path(self.get_idx())
+
 class Forum:
 	periods={}
 	
 	def __init__(self):
 		pass
-	
-	class Period:
-		def __init__(self, idx, name):
-			self.idx = idx
-			self.name = name
-			self.courses = {}
 
-		def path(self):
-			return remove_non_path(self.name)
-	
-	class Course:
-		def __init__(self, idx, name):
-			self.idx = idx
-			self.name = name
-			self.classes = {}
-	
-		def path(self):
-			return remove_non_path(self.name)
-	
-	class Class:
-		def __init__(self, idx, name):
-			self.idx = idx
-			self.name = name
-			self.threads = set()
-			
-		def path(self):
-			return remove_non_path(self.name)
-	
-	class Thread:
-		def __init__(self, url, name, by):
-			self.url = url
-			self.name = name
-			self.by = by
-			if url[-5:] != '?id=1': raise ValueError('Unexpected url suffix')
-		
-		def path(self):
-			return remove_non_path(self.name)
-	
-		def get_idx(self):
-			return self.url.split('.')[-1][:-5]
-	
 	@staticmethod
 	def find_forum_fields(browser):
 		exceptions=set()
@@ -315,7 +318,7 @@ class Forum:
 				sleep(1)
 		else: raise Exception(TimeoutError('Unable to retrieve available periods'), periods)
 		
-		return [Forum.Period(p.get_attribute('value'), p.get_attribute('innerHTML')) for p in periods]
+		return [Period(p.get_attribute('innerHTML')) for p in periods]
 	
 	@staticmethod
 	def find_courses(browser):
@@ -329,7 +332,7 @@ class Forum:
 				sleep(0.5)
 		else: raise Exception(TimeoutError('Unable to retrieve available courses', exceptions))
 		
-		return [Forum.Course(c.get_attribute('value'), c.get_attribute('innerHTML')) for c in courses]
+		return [Course(c.get_attribute('innerHTML')) for c in courses]
 
 	@staticmethod
 	def find_classes(browser):
@@ -343,7 +346,7 @@ class Forum:
 				sleep(0.5)
 		else: raise Exception(TimeoutError('Unable to retrieve available classes', exceptions))
 		
-		return [Forum.Class(c.get_attribute('value'), c.get_attribute('innerHTML')) for c in classes]
+		return [Class(c.get_attribute('innerHTML')) for c in classes]
 
 	@staticmethod
 	def get_threads(browser):
@@ -361,7 +364,7 @@ class Forum:
 			return set()
 		
 		threads=[t.find_element(By.CLASS_NAME, thread_title_class) for t in threads]
-		threads=[Forum.Thread(t.find_element(By.TAG_NAME, 'a').get_attribute('href')
+		threads=[Thread(t.find_element(By.TAG_NAME, 'a').get_attribute('href')
 								, t.find_element(By.TAG_NAME, 'a').get_attribute('innerHTML')
 								, t.get_attribute('innerHTML').split('By: ')[-1].strip()
 								)
@@ -370,32 +373,113 @@ class Forum:
 		
 		return set(threads)
 
-	# (TODO) salah total
 	@staticmethod
 	def load_cache():
-		for period in Forum.periods:
-			for course in period.courses:
-				for clas in course.classes:
-					path='forum/'+period.path()+'/'+course.path()+'/'+clas.path()
+		# read available periods
+		with open('forum/periods.txt', 'r+') as periods_file:
+			period_names=[line.strip() for line in periods_file.readlines()]
 
-					with open(path+'/threads.txt', 'r+') as list_file:
-						thread_names=set(t.strip() for t in list_file.readlines())
+		# for each periods
+		for period_name in period_names:
+			period_path='forum/'+remove_non_path(period_name)
+
+			# read data for the period
+			with open(period_path+'/period.txt', 'r+') as period_file:
+				period_data=[line.strip() for line in period_file.readlines()]
+
+			# read available courses for the period
+			with open(period_path+'/courses.txt', 'r+') as courses_file:
+				course_names=[line.strip() for line in courses_file.readlines()]
+
+			# save the period
+			period=Period(period_data[0])
+			Forum.periods[period.name]=period
+
+			# for each course in the period
+			for course_name in course_names:
+				course_path=period_path+'/'+remove_non_path(course_name)
+
+				# read data for the course
+				with open(course_path+'/course.txt', 'r+') as course_file:
+					course_data=[line.strip() for line in course_file.readlines()]
+
+				# read available classes for the course
+				with open(course_path+'/classes.txt', 'r+') as classes_file:
+					class_names=[line.strip() for line in classes_file.readlines()]
+
+				# save the course
+				course=Course(course_data[0])
+				period.courses[course.name]=course
+				
+				# for each class in the course
+				for class_name in class_names:
+					class_path=course_path+'/'+remove_non_path(class_name)
+
+					# read data for the class
+					with open(class_path+'/class.txt', 'r+') as class_file:
+						class_data=[line.strip() for line in class_file.readlines()]
+
+					# read available threads for the class
+					with open(class_path+'/threads.txt', 'r+') as threads_file:
+						thread_names=[line.strip() for line in threads_file.readlines()]
+
+					# save the class
+					clas=Class(class_data[0])
+					course.classes[clas.name]=clas
 					
+					# for each thread in the class
 					for thread_name in thread_names:
-						with open(path+thread_name, 'r+') as thread:
-							properties=[t.strip() for t in thread.readlines()]
-							clas.threads.add(Forum.Thread(properties[0], properties[1], properties[2]))
+
+						# read data for the thread
+						with open(class_path+'/'+thread_name+'/thread.txt') as thread_file:
+							thread_data=[line.strip() for line in thread_file.readlines()]
+						
+						# save the thread
+						thread=Thread(thread_data[0], thread_data[1], thread_data[2])
+						clas.threads.add(thread)
+
 	@staticmethod
-	def add_to_cache(period, course, clas, thread):
-		path='forum/'+period.path()+'/'+course.path()+'/'+clas.path()
+	def add_to_cache(period, course=None, clas=None, thread=None):
+		# appends path based on depth of new element
+		# creates directory if it doesn't exist
+		path='forum'
+		pathlib.Path(os.getcwd()+'/'+path+'/'+period.path()).mkdir(parents=True, exist_ok=True)
 
-		pathlib.Path(os.getcwd()+'/'+path).mkdir(parents=True, exist_ok=True)
+		if course:
+			path+='/'+period.path()
+			pathlib.Path(os.getcwd()+'/'+path+'/'+course.path()).mkdir(parents=True, exist_ok=True)
+		if clas:
+			path+='/'+course.path()
+			pathlib.Path(os.getcwd()+'/'+path+'/'+clas.path()).mkdir(parents=True, exist_ok=True)
+		if thread:
+			path+='/'+clas.path()
+			pathlib.Path(os.getcwd()+'/'+path+'/'+thread.path()).mkdir(parents=True, exist_ok=True)
 
-		with open(path+'/threads.txt', 'a+') as list_file:
-			list_file.write(thread.name+'\n')
-			
-		with open(path+'/'+thread.path(), 'w+') as thread_file:
-			thread_file.write(thread.url+'\n'+thread.name+'\n'+thread.by)
+		# writes the appropriate file
+		if thread:
+			with open(path+'/threads.txt', 'a+') as list_file:
+				list_file.write(thread.get_idx()+'\n')
+			with open(path+'/'+thread.path()+'/thread.txt', 'w+') as thread_file:
+				thread_file.write(thread.url+'\n'+thread.name+'\n'+thread.by+'\n')
+
+		elif clas:
+			with open(path+'/classes.txt', 'a+') as list_file:
+				list_file.write(clas.name+'\n')
+			with open(path+'/'+clas.path()+'/class.txt', 'w+') as class_file:
+				class_file.write(clas.idx+'\n'+clas.name+'\n')
+			with open(path+'/'+clas.path()+'/threads.txt', 'w+'): pass
+
+		elif course:
+			with open(path+'/courses.txt', 'a+') as list_file:
+				list_file.write(course.name+'\n')
+			with open(path+'/'+course.path()+'/course.txt', 'w+') as course_file:
+				course_file.write(str(course.idx)+'\n'+course.name+'\n')		
+
+		else:
+			with open(path+'/periods.txt', 'a+') as list_file:
+				list_file.write(period.name+'\n')
+			with open(path+'/'+period.path()+'/period.txt', 'w+') as period_file:
+				period_file.write(str(period.idx)+'\n'+period.name+'\n')		
 
 	@staticmethod
 	def validate_cache():
@@ -431,58 +515,78 @@ class Forum:
 		
 		# get available periods
 		print('Getting all available periods')
-		Forum.periods=Forum.find_periods(browser)
+		periods=Forum.find_periods(browser)
+
+		# check for new periods
+		for period in periods:
+			# if period is new
+			if period not in Forum.periods.values():
+				Forum.add_to_cache(period)
+				Forum.periods[period.idx]=period
 
 		# get data for each period
-		for period in Forum.periods:
-			
+		for period in Forum.periods.values():
 			# select period in dropdown
-			period_field.select_by_value(period.idx)
+			period_field.select_by_visible_text(period.name)
 
 			# get available courses for the period
 			print('Getting courses for', period.name)
-			period.courses=Forum.find_courses(browser)
-			
-			# get data for each course
-			for course in period.courses:
+			courses=Forum.find_courses(browser)
+
+			# check for new courses in the period
+			for course in courses:
+				# if course is new
+				if course not in period.courses.values():
+					Forum.add_to_cache(period, course)
+					period.courses[course.idx]=course
 				
+			# get data for each course in the period
+			for course in period.courses.values():
 				# select course in dropdown
-				course_field.select_by_value(course.idx)
+				course_field.select_by_visible_text(course.name)
 			
 				# get available classes for each course
 				print('Getting classes for', course.name)
-				course.classes=Forum.find_classes(browser)
+				classes=Forum.find_classes(browser)
 				
+				# check for new classes in the period
+				for clas in classes:
+					if clas not in course.classes.values():
+						Forum.add_to_cache(period, course, clas)
+						course.classes[clas.idx]=clas
+
 				# get data for each class
-				for clas in course.classes:
-					
+				for clas in course.classes.values():
 					# select course in dropdown
-					class_field.select_by_value(clas.idx)
+					class_field.select_by_visible_text(clas.name)
 					
 					# get threads for the class
 					print('Getting threads for', course.name, clas.name)
 					threads=Forum.get_threads(browser)
 
-					# check for new threads
+					# check for new threads	
 					for thread in threads:
-						if thread not in clas.threads:
+						if thread not in clas.threads.values():
+							# (TODO) delete this
+							print('\nclas.threads:', clas.threads,'\n')
 							# add new thread to notifications
 							Notifications.add_forum_notification('New thread by '+thread.by+': '+thread.name)
 							# add thread to database
 							Forum.add_to_cache(period, course, clas, thread)
-
 					clas.threads=threads
 
 					# (TODO) delete later
 					for thread in threads:
 						print(thread.name, thread.by, thread.url, thread.get_idx(), '\n', sep='\n')
-				
+
 				print('===============================')
-			Forum.validate_cache()
+		
 
 if __name__ == '__main__':
-	
-	Forum.load_cache()
+	try:
+		Forum.load_cache()
+	except FileNotFoundError as e:
+		print(e)
 
 	runPath = os.path.dirname(os.path.abspath(__file__))
 
