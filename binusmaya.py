@@ -8,7 +8,16 @@ from getpass import getpass
 
 import contextlib
 import pathlib
+import pickle
 import os
+
+# for notif
+from win32api import *
+from win32gui import *
+import win32con
+import sys, os
+import struct
+import time
 
 # login constants
 login_url='https://binusmaya.binus.ac.id/login/'
@@ -35,7 +44,50 @@ no_thread_html='<td colspan="4" style="text-align:center;">No Data Found</td>'
 
 thread_title_class='ctitle'
 
+class WindowsBalloonTip:
+    def __init__(self, title, msg):
+        message_map = {
+                win32con.WM_DESTROY: self.OnDestroy,
+        }
+        # Register the Window class.
+        wc = WNDCLASS()
+        hinst = wc.hInstance = GetModuleHandle(None)
+        wc.lpszClassName = "PythonTaskbar"
+        wc.lpfnWndProc = message_map # could also specify a wndproc.
+        classAtom = RegisterClass(wc)
+        # Create the Window.
+        style = win32con.WS_OVERLAPPED | win32con.WS_SYSMENU
+        self.hwnd = CreateWindow( classAtom, "Taskbar", style, \
+                0, 0, win32con.CW_USEDEFAULT, win32con.CW_USEDEFAULT, \
+                0, 0, hinst, None)
+        UpdateWindow(self.hwnd)
+        iconPathName = os.path.abspath(os.path.join( sys.path[0], "balloontip.ico" ))
+        icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+        try:
+           hicon = LoadImage(hinst, iconPathName, \
+                    win32con.IMAGE_ICON, 0, 0, icon_flags)
+        except:
+          hicon = LoadIcon(0, win32con.IDI_APPLICATION)
+        flags = NIF_ICON | NIF_MESSAGE | NIF_TIP
+        nid = (self.hwnd, 0, flags, win32con.WM_USER+20, hicon, "tooltip")
+        Shell_NotifyIcon(NIM_ADD, nid)
+        Shell_NotifyIcon(NIM_MODIFY, \
+                         (self.hwnd, 0, NIF_INFO, win32con.WM_USER+20,\
+                          hicon, "Balloon  tooltip",msg,200,title))
+        # self.show_balloon(title, msg)
+        time.sleep(10)
+        DestroyWindow(self.hwnd)
+        UnregisterClass(classAtom, hinst)
+    def OnDestroy(self, hwnd, msg, wparam, lparam):
+        nid = (self.hwnd, 0)
+        Shell_NotifyIcon(NIM_DELETE, nid)
+        PostQuitMessage(0) # Terminate the app.
+
+def balloon_tip(title, msg):
+    WindowsBalloonTip(title, msg)
+
 class Notifications:
+
 	forum=[]
 	has_notification=False
 
@@ -47,17 +99,20 @@ class Notifications:
 		Notifications.forum.append(notification)
 		Notifications.has_notification=True
 	
-	# (TODO) change to actual notifications later
+	# (TODO) try plyer and win10toast modules
 	@staticmethod
 	def notify():
+		notification=''
 		if Notifications.forum:
-			print('Forum:')
+			notification+='Forum:\n'
 			for f in Notifications.forum:
-				print(f)
-			print('=======================')
+				notification+=f+'\n'
+			notification+='=======================\n'
 		
 		Notifications.forum=[]
 		Notifications.has_notification=False
+
+		balloon_tip('New items in binusmaya:', notification)
 
 class initialise_browser:
 	
@@ -253,6 +308,9 @@ class Category:
 	def __hash__(self):
 		return hash(self.name)
 
+	def __repr__(self):
+		return self.name
+
 	def path(self):
 		return remove_non_path(self.name)
 
@@ -271,10 +329,10 @@ class Class(Category):
 		super().__init__(name)
 		self.threads = set()
 		
-class Thread:
+class Thread(Category):
 	def __init__(self, url, name, by):
+		super().__init__(name)
 		self.url = url
-		self.name = name
 		self.by = by
 		if url[-5:] != '?id=1': raise ValueError('Unexpected url suffix')
 
@@ -374,129 +432,15 @@ class Forum:
 		return set(threads)
 
 	@staticmethod
-	def load_cache():
-		# read available periods
-		with open('forum/periods.txt', 'r+') as periods_file:
-			period_names=[line.strip() for line in periods_file.readlines()]
-
-		# for each periods
-		for period_name in period_names:
-			period_path='forum/'+remove_non_path(period_name)
-
-			# read data for the period
-			with open(period_path+'/period.txt', 'r+') as period_file:
-				period_data=[line.strip() for line in period_file.readlines()]
-
-			# read available courses for the period
-			with open(period_path+'/courses.txt', 'r+') as courses_file:
-				course_names=[line.strip() for line in courses_file.readlines()]
-
-			# save the period
-			period=Period(period_data[0])
-			Forum.periods[period.name]=period
-
-			# for each course in the period
-			for course_name in course_names:
-				course_path=period_path+'/'+remove_non_path(course_name)
-
-				# read data for the course
-				with open(course_path+'/course.txt', 'r+') as course_file:
-					course_data=[line.strip() for line in course_file.readlines()]
-
-				# read available classes for the course
-				with open(course_path+'/classes.txt', 'r+') as classes_file:
-					class_names=[line.strip() for line in classes_file.readlines()]
-
-				# save the course
-				course=Course(course_data[0])
-				period.courses[course.name]=course
-				
-				# for each class in the course
-				for class_name in class_names:
-					class_path=course_path+'/'+remove_non_path(class_name)
-
-					# read data for the class
-					with open(class_path+'/class.txt', 'r+') as class_file:
-						class_data=[line.strip() for line in class_file.readlines()]
-
-					# read available threads for the class
-					with open(class_path+'/threads.txt', 'r+') as threads_file:
-						thread_names=[line.strip() for line in threads_file.readlines()]
-
-					# save the class
-					clas=Class(class_data[0])
-					course.classes[clas.name]=clas
-					
-					# for each thread in the class
-					for thread_name in thread_names:
-
-						# read data for the thread
-						with open(class_path+'/'+thread_name+'/thread.txt') as thread_file:
-							thread_data=[line.strip() for line in thread_file.readlines()]
-						
-						# save the thread
-						thread=Thread(thread_data[0], thread_data[1], thread_data[2])
-						clas.threads.add(thread)
+	def save_data():
+		pathlib.Path(os.getcwd()+'/forum').mkdir(parents=True, exist_ok=True)
+		with open('forum/forum.pkl', 'wb+') as f:
+			pickle.dump(Forum.periods, f, pickle.HIGHEST_PROTOCOL)
 
 	@staticmethod
-	def add_to_cache(period, course=None, clas=None, thread=None):
-		# appends path based on depth of new element
-		# creates directory if it doesn't exist
-		path='forum'
-		pathlib.Path(os.getcwd()+'/'+path+'/'+period.path()).mkdir(parents=True, exist_ok=True)
-
-		if course:
-			path+='/'+period.path()
-			pathlib.Path(os.getcwd()+'/'+path+'/'+course.path()).mkdir(parents=True, exist_ok=True)
-		if clas:
-			path+='/'+course.path()
-			pathlib.Path(os.getcwd()+'/'+path+'/'+clas.path()).mkdir(parents=True, exist_ok=True)
-		if thread:
-			path+='/'+clas.path()
-			pathlib.Path(os.getcwd()+'/'+path+'/'+thread.path()).mkdir(parents=True, exist_ok=True)
-
-		# writes the appropriate file
-		if thread:
-			with open(path+'/threads.txt', 'a+') as list_file:
-				list_file.write(thread.get_idx()+'\n')
-			with open(path+'/'+thread.path()+'/thread.txt', 'w+') as thread_file:
-				thread_file.write(thread.url+'\n'+thread.name+'\n'+thread.by+'\n')
-
-		elif clas:
-			with open(path+'/classes.txt', 'a+') as list_file:
-				list_file.write(clas.name+'\n')
-			with open(path+'/'+clas.path()+'/class.txt', 'w+') as class_file:
-				class_file.write(clas.idx+'\n'+clas.name+'\n')
-			with open(path+'/'+clas.path()+'/threads.txt', 'w+'): pass
-
-		elif course:
-			with open(path+'/courses.txt', 'a+') as list_file:
-				list_file.write(course.name+'\n')
-			with open(path+'/'+course.path()+'/course.txt', 'w+') as course_file:
-				course_file.write(str(course.idx)+'\n'+course.name+'\n')		
-
-		else:
-			with open(path+'/periods.txt', 'a+') as list_file:
-				list_file.write(period.name+'\n')
-			with open(path+'/'+period.path()+'/period.txt', 'w+') as period_file:
-				period_file.write(str(period.idx)+'\n'+period.name+'\n')		
-
-	@staticmethod
-	def validate_cache():
-		for period in Forum.periods:
-			for course in period.courses:
-				for clas in course.classes:
-					if not clas.threads: continue
-					
-					path='forum/'+period.path()+'/'+course.path()+'/'+clas.path()
-
-					with open(path+'/threads.txt', 'r+') as list_file:
-						thread_names=[t.strip() for t in list_file.readlines()]
-						thread_names_unique=set(thread_names)
-					if len(thread_names) != len(thread_names_unique):
-						with open(path+'/threads.txt', 'w+') as list_file:
-							for thread_name in thread_names_unique:
-								list_file.write(thread_name+'\n')
+	def load_data():
+		with open('forum/forum.pkl', 'rb') as f:
+			Forum.periods=pickle.load(f)
 
 	@staticmethod
 	def get_forum_data(browser):
@@ -521,8 +465,7 @@ class Forum:
 		for period in periods:
 			# if period is new
 			if period not in Forum.periods.values():
-				Forum.add_to_cache(period)
-				Forum.periods[period.idx]=period
+				Forum.periods[period.name]=period
 
 		# get data for each period
 		for period in Forum.periods.values():
@@ -537,8 +480,7 @@ class Forum:
 			for course in courses:
 				# if course is new
 				if course not in period.courses.values():
-					Forum.add_to_cache(period, course)
-					period.courses[course.idx]=course
+					period.courses[course.name]=course
 				
 			# get data for each course in the period
 			for course in period.courses.values():
@@ -552,8 +494,7 @@ class Forum:
 				# check for new classes in the period
 				for clas in classes:
 					if clas not in course.classes.values():
-						Forum.add_to_cache(period, course, clas)
-						course.classes[clas.idx]=clas
+						course.classes[clas.name]=clas
 
 				# get data for each class
 				for clas in course.classes.values():
@@ -566,27 +507,21 @@ class Forum:
 
 					# check for new threads	
 					for thread in threads:
-						if thread not in clas.threads.values():
-							# (TODO) delete this
-							print('\nclas.threads:', clas.threads,'\n')
+						if thread not in clas.threads:
 							# add new thread to notifications
 							Notifications.add_forum_notification('New thread by '+thread.by+': '+thread.name)
-							# add thread to database
-							Forum.add_to_cache(period, course, clas, thread)
 					clas.threads=threads
+					
+		Forum.save_data()
 
-					# (TODO) delete later
-					for thread in threads:
-						print(thread.name, thread.by, thread.url, thread.get_idx(), '\n', sep='\n')
-
-				print('===============================')
-		
+def init():
+	try:
+		Forum.load_data()
+	except:
+		print('Forum cache not found')			
 
 if __name__ == '__main__':
-	try:
-		Forum.load_cache()
-	except FileNotFoundError as e:
-		print(e)
+	init()
 
 	runPath = os.path.dirname(os.path.abspath(__file__))
 
