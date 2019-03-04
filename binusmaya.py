@@ -1,3 +1,7 @@
+# (TODO) separate classes to files
+# (TODO) try plyer and win10toast modules for tray notifications
+
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
@@ -99,7 +103,6 @@ class Notifications:
 		Notifications.forum.append(notification)
 		Notifications.has_notification=True
 	
-	# (TODO) try plyer and win10toast modules
 	@staticmethod
 	def notify():
 		notification=''
