@@ -1,20 +1,13 @@
 # (TODO) try plyer and win10toast modules for tray notifications
 
-from time import sleep
-from getpass import getpass
-
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select
-
 import os
-
-from lib import silence
-from lib import browseractions
-from lib import login
-from lib import forum
 
 from lib.notifications import Notifications
 
+
+from lib import browseractions
+from lib import login
+from lib import forum
 
 def init():
 	try:
