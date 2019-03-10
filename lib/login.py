@@ -5,6 +5,8 @@ from getpass import getpass
 
 import lib.browseractions as browseractions
 
+credentials_file_path='.\\lib\\credentials.txt'
+
 login_url='https://binusmaya.binus.ac.id/login/'
 	
 username_field_xpath='//*[@id="login"]/form/div[1]/label/input'
@@ -12,9 +14,8 @@ password_field_xpath='//*[@id="login"]/form/p[1]/span/input'
 login_button_css='.button.button-primary.wide'
 
 def get_credentials():
-    filepath='.\\lib\\credentials.txt'
     try:
-        with open(filepath, 'r') as cred_file:
+        with open(credentials_file_path, 'r') as cred_file:
             username, password=cred_file.read().splitlines()[:2]
             
     except:
@@ -24,7 +25,7 @@ def get_credentials():
         remember=input('Remember password? Your password will be saved as plaintext. [y/N]: ')
         
         if (remember.lower() in ('y', 'yes')):
-            with open(filepath, 'w') as cred_file:
+            with open(credentials_file_path, 'w') as cred_file:
                 cred_file.write(username + '\n')
                 cred_file.write(password + '\n')
         
@@ -111,3 +112,7 @@ def load_url(browser, url):
 		if is_logged_in(browser): break
 		handle_session_timeout(browser)
 		sleep(0.5)
+
+def logout(browser):
+    open(credentials_file_path, 'w').close()
+    login(browser)
