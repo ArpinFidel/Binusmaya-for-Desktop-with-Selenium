@@ -42,7 +42,7 @@ def is_logged_in(browser):
 
 
 def find_login_elements(browser):
-    exceptions=set()
+    exceptions=[]
     for _ in range(5):
         try:
             elements=(
@@ -52,7 +52,7 @@ def find_login_elements(browser):
                 )
             break
         except Exception as e:
-            exceptions.add(e)
+            exceptions.append(e)
             sleep(0.5)	
     else: raise Exception(TimeoutError('Cannot find login fields'), exceptions)
     
@@ -62,7 +62,7 @@ def find_login_elements(browser):
 def login(browser):
     
     print('Logging in')
-    login_exceptions=set()
+    login_exceptions=[]
     for _ in range(10):
         try:
             print('Getting credentials')
@@ -81,7 +81,7 @@ def login(browser):
             sleep(0.25)
             if is_logged_in(browser): break
         except Exception as e:
-            login_exceptions.add(e)
+            login_exceptions.append(e)
             sleep(0.5)
         else:
             sleep(0.5)

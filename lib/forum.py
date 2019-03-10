@@ -83,7 +83,7 @@ def __init__(self):
 
 
 def find_forum_fields(browser):
-    exceptions=set()
+    exceptions=[]
     for _ in range(10):
         try:
             fields=(Select(browser.find_element(By.XPATH, period_field_xpath))
@@ -91,7 +91,7 @@ def find_forum_fields(browser):
                 , Select(browser.find_element(By.XPATH, class_field_xpath)))
             break
         except Exception as e:
-            exceptions.add(e)
+            exceptions.append(e)
             sleep(1)
     else: raise Exception(TimeoutError('Unable to find forum fields'), exceptions)
     
@@ -99,13 +99,13 @@ def find_forum_fields(browser):
 
 
 def find_periods(browser):
-    exceptions=set()
+    exceptions=[]
     for _ in range(10):
         try:
             periods=browser.find_elements(By.XPATH, periods_xpath)
             break
         except Exception as e:
-            exceptions.add(e)
+            exceptions.append(e)
             sleep(1)
     else: raise Exception(TimeoutError('Unable to retrieve available periods'), periods)
     
@@ -113,13 +113,13 @@ def find_periods(browser):
 
 
 def find_courses(browser):
-    exceptions=set()
+    exceptions=[]
     for _ in range(5):
         try:
             courses=browser.find_elements(By.XPATH, courses_xpath)
             break
         except Exception as e:
-            exceptions.add(e)
+            exceptions.append(e)
             sleep(0.5)
     else: raise Exception(TimeoutError('Unable to retrieve available courses', exceptions))
     
@@ -127,13 +127,13 @@ def find_courses(browser):
 
 
 def find_classes(browser):
-    exceptions=set()
+    exceptions=[]
     for _ in range(5):
         try:
             classes=browser.find_elements(By.XPATH, classs_xpath)
             break
         except Exception as e:
-            exceptions.add(e)
+            exceptions.append(e)
             sleep(0.5)
     else: raise Exception(TimeoutError('Unable to retrieve available classes', exceptions))
     
@@ -141,13 +141,13 @@ def find_classes(browser):
 
 
 def get_threads(browser):
-    exceptions=set()
+    exceptions=[]
     for _ in range(5):
         try:
             threads=browser.find_elements(By.XPATH, threads_xpath)
             break
         except Exception as e:
-            exceptions.add(e)
+            exceptions.append(e)
             sleep(1)
     else: raise Exception(TimeoutError('Unable to retrieve threads', exceptions))
 
