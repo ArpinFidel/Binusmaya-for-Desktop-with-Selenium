@@ -18,9 +18,9 @@ from lib.notifications import Notifications
 
 def init():
 	try:
-		Forum.load_data()
-	except:
-		print('Forum cache not found')			
+		forum.load_data()
+	except Exception as e:
+		print('Cannot load forum cache', e)			
 
 if __name__ == '__main__':
 	init()

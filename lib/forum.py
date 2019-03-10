@@ -29,6 +29,8 @@ no_thread_html='<td colspan="4" style="text-align:center;">No Data Found</td>'
 
 thread_title_class='ctitle'
 
+periods={}
+
 class Category:
 	def __init__(self, name):
 		self.name = name
@@ -76,12 +78,6 @@ class Thread(Category):
 	def path(self):
 		return browseractions.remove_non_path(self.get_idx())
 
-periods={}
-
-def __init__(self):
-    pass
-
-
 def find_forum_fields(browser):
     exceptions=[]
     for _ in range(10):
@@ -109,7 +105,7 @@ def find_periods(browser):
             sleep(1)
     else: raise Exception(TimeoutError('Unable to retrieve available periods'), periods)
     
-    return [Period(p.get_attribute('innerHTML')) for p in periods]
+    return {p.get_attribute('innerHTML'):Period(p.get_attribute('innerHTML')) for p in periods}
 
 
 def find_courses(browser):
@@ -170,7 +166,6 @@ def save_data():
     with open('forum/forum.pkl', 'wb+') as f:
         pickle.dump(periods, f, pickle.HIGHEST_PROTOCOL)
 
-
 def load_data():
     global periods
     with open('forum/forum.pkl', 'rb') as f:
@@ -178,6 +173,7 @@ def load_data():
 
 
 def fetch_data(browser):
+    global periods
     
     # load the page
     print('Loading forum')
@@ -196,13 +192,13 @@ def fetch_data(browser):
     periods=find_periods(browser)
 
     # check for new periods
-    for period in periods:
+    for period in periods.values():
         # if period is new
-        if period not in periods:
+        if period not in periods.values():
             periods[period.name]=period
 
     # get data for each period
-    for period in periods:
+    for period in periods.values():
         # select period in dropdown
         period_field.select_by_visible_text(period.name)
 

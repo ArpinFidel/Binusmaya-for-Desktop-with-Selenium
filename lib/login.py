@@ -85,7 +85,7 @@ def login(browser):
             sleep(0.5)
         else:
             sleep(0.5)
-            if not is_logged_in(browser): login_exceptions.add(Exception('Server is not responding'))
+            if not is_logged_in(browser): login_exceptions.append(Exception('Server is not responding'))
     else: raise Exception(TimeoutError('Cannot login'), login_exceptions)
     
     print('Stopping browser from redirecting')
@@ -107,6 +107,7 @@ def load_url(browser, url):
 	for _ in range(20):
 		if browser.current_url == url: break
 		browser.get(url)
+		sleep(1)
 		if is_logged_in(browser): break
 		handle_session_timeout(browser)
 		sleep(0.5)
