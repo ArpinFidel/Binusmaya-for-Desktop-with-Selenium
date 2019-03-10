@@ -30,6 +30,7 @@ no_thread_html='<td colspan="4" style="text-align:center;">No Data Found</td>'
 thread_title_class='ctitle'
 
 periods={}
+thread_replies={}
 
 class Category:
 	def __init__(self, name):
@@ -64,7 +65,14 @@ class Class(Category):
 	def __init__(self, name):
 		super().__init__(name)
 		self.threads = set()
-		
+
+class Reply:
+    def __init__(self, by, title, body, attachments=None):
+        self.by = by
+        self.title = title
+        self.body = body
+        self.attachments = attachments
+
 class Thread(Category):
 	def __init__(self, url, name, by):
 		super().__init__(name)
@@ -248,3 +256,12 @@ def fetch_data(browser, current_semester=False):
 
 def fetch_semester_data(browser):
     fetch_data(browser, current_semester=True)
+
+def fetch_replies(browser):
+    for period in periods:
+        for course in period.courses:
+            for clas in course.classes:
+                for thread in clas.threads:
+                    # open the thread
+                    login.load_url(browser, thread.url)
+                    

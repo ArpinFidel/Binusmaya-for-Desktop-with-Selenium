@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
 	with browseractions.initialise_browser(runPath) as (browser, _):
 		login.login(browser)
-		forum.fetch_semester_data(browser)
+		forum.fetch_data(browser)
 		if Notifications.has_notification:
 			Notifications.notify()
 
