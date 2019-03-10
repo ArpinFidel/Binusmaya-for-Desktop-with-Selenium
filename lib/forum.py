@@ -68,9 +68,10 @@ class Class(Category):
 class Thread(Category):
 	def __init__(self, url, name, by):
 		super().__init__(name)
+		if url[-5:] != '?id=1': raise ValueError('Unexpected url suffix')
 		self.url = url
 		self.by = by
-		if url[-5:] != '?id=1': raise ValueError('Unexpected url suffix')
+		self.replies = []
 
 	def get_idx(self):
 		return self.url.split('.')[-1][:-5]
@@ -105,7 +106,7 @@ def find_periods(browser):
             sleep(1)
     else: raise Exception(TimeoutError('Unable to retrieve available periods'), periods)
     
-    return {p.get_attribute('innerHTML'):Period(p.get_attribute('innerHTML')) for p in periods}
+    return [Period(p.get_attribute('innerHTML')) for p in periods]
 
 
 def find_courses(browser):
@@ -172,7 +173,7 @@ def load_data():
         periods=pickle.load(f)
 
 
-def fetch_data(browser):
+def fetch_data(browser, current_semester=False):
     global periods
     
     # load the page
@@ -188,26 +189,27 @@ def fetch_data(browser):
     period_field, course_field, class_field=find_forum_fields(browser)
     
     # get available periods
-    print('Getting all available periods')
-    periods=find_periods(browser)
+    if not current_semester:
+        print('Getting all available periods')
+    new_periods=find_periods(browser)
 
     # check for new periods
-    for period in periods.values():
+    for period in new_periods:
         # if period is new
         if period not in periods.values():
             periods[period.name]=period
 
     # get data for each period
-    for period in periods.values():
+    for period in [periods[period_field.first_selected_option.text]] if current_semester else periods.values():
         # select period in dropdown
         period_field.select_by_visible_text(period.name)
 
         # get available courses for the period
         print('Getting courses for', period.name)
-        courses=find_courses(browser)
+        new_courses=find_courses(browser)
 
         # check for new courses in the period
-        for course in courses:
+        for course in new_courses:
             # if course is new
             if course not in period.courses.values():
                 period.courses[course.name]=course
@@ -219,10 +221,10 @@ def fetch_data(browser):
         
             # get available classes for each course
             print('Getting classes for', course.name)
-            classes=find_classes(browser)
+            new_classes=find_classes(browser)
             
             # check for new classes in the period
-            for clas in classes:
+            for clas in new_classes:
                 if clas not in course.classes.values():
                     course.classes[clas.name]=clas
 
@@ -233,13 +235,16 @@ def fetch_data(browser):
                 
                 # get threads for the class
                 print('Getting threads for', course.name, clas.name)
-                threads=get_threads(browser)
+                new_threads=get_threads(browser)
 
                 # check for new threads	
-                for thread in threads:
+                for thread in new_threads:
                     if thread not in clas.threads:
                         # add new thread to notifications
                         Notifications.add_forum_notification('New thread by '+thread.by+': '+thread.name)
-                clas.threads=threads
+                clas.threads=new_threads
                 
     save_data()
+
+def fetch_semester_data(browser):
+    fetch_data(browser, current_semester=True)

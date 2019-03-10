@@ -4,7 +4,6 @@ import os
 
 from lib.notifications import Notifications
 
-
 from lib import browseractions
 from lib import login
 from lib import forum
@@ -17,12 +16,12 @@ def init():
 
 if __name__ == '__main__':
 	init()
-
+	
 	runPath = os.path.dirname(os.path.abspath(__file__))
 
 	with browseractions.initialise_browser(runPath) as (browser, _):
 		login.login(browser)
-		forum.fetch_data(browser)
+		forum.fetch_semester_data(browser)
 		if Notifications.has_notification:
 			Notifications.notify()
 
