@@ -198,11 +198,11 @@ def fetch_data(browser):
     # check for new periods
     for period in periods:
         # if period is new
-        if period not in periods.values():
+        if period not in periods:
             periods[period.name]=period
 
     # get data for each period
-    for period in periods.values():
+    for period in periods:
         # select period in dropdown
         period_field.select_by_visible_text(period.name)
 
